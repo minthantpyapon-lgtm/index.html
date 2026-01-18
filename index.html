@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CWH Database - Filter Included</title>
+    <title>CWH Database - Sort & Filter</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --primary: #1f2937; --accent: #2563eb; --bg: #f3f4f6; --border-color: #d1d5db; --success: #db2777; --save-color: #059669; --danger: #dc2626; }
@@ -19,8 +19,13 @@
         .table-wrapper { border-radius: 8px; border: 1px solid var(--border-color); background: white; overflow-x: auto; position: relative; }
         table { width: 100%; border-collapse: collapse; table-layout: auto; }
         
-        thead th { background-color: var(--primary); color: #ffffff; text-align: left; padding: 12px 10px; font-size: 0.8rem; font-weight: 600; border-right: 1px solid #374151; white-space: nowrap; cursor: pointer; }
+        thead th { background-color: var(--primary); color: #ffffff; text-align: left; padding: 12px 10px; font-size: 0.8rem; font-weight: 600; border-right: 1px solid #374151; white-space: nowrap; cursor: pointer; position: relative; }
         thead th:hover { background-color: #374151; }
+        
+        /* Sorting Icons */
+        .sort-icon:after { content: ' ↕'; font-size: 0.7rem; opacity: 0.5; margin-left: 5px; }
+        .sort-asc:after { content: ' ↑'; opacity: 1; color: #10b981; }
+        .sort-desc:after { content: ' ↓'; opacity: 1; color: #10b981; }
 
         td { border: 1px solid var(--border-color); padding: 12px 10px; color: #000000 !important; font-size: 0.85rem; outline: none; font-weight: 700; white-space: nowrap; background-color: #ffffff; }
         .no-col { width: 50px; text-align: center; }
@@ -51,8 +56,8 @@
         <table id="mainTable">
             <thead>
                 <tr>
-                    <th class="no-col" onclick="showAllRows()">No </th>
-                    <th style="min-width:60px" onclick="showFilter(1, event)">Line ▼</th>
+                    <th class="no-col" onclick="showAllRows()">No</th>
+                    <th style="min-width:80px" class="sort-icon" onclick="sortTable(1, this)">Line</th>
                     <th style="min-width:200px" onclick="showFilter(2, event)">Item ▼</th>
                     <th style="min-width:150px">Location</th>
                 </tr>
@@ -75,6 +80,7 @@
     const tbody = document.getElementById('tableBody');
     const popup = document.getElementById('customPopup');
     const saveStatus = document.getElementById('saveStatus');
+    let sortDirection = true; // true = Asc, false = Desc
 
     window.onload = () => {
         const d = new Date();
@@ -107,6 +113,31 @@
     function createRow(no, line = '', item = '', loc = '') {
         const row = tbody.insertRow();
         row.innerHTML = `<td class="no-col" contenteditable="true">${no}</td><td contenteditable="true">${line}</td><td contenteditable="true" oninput="handleItemInput(this)">${item}</td><td contenteditable="true">${loc}</td>`;
+    }
+
+    // Line Column အတွက် Sorting Function
+    function sortTable(colIndex, headerElement) {
+        const rows = Array.from(tbody.rows);
+        
+        rows.sort((a, b) => {
+            const valA = a.cells[colIndex].innerText.trim().toLowerCase();
+            const valB = b.cells[colIndex].innerText.trim().toLowerCase();
+            
+            if (!valA && valB) return 1;
+            if (valA && !valB) return -1;
+            
+            return sortDirection 
+                ? valA.localeCompare(valB, undefined, {numeric: true, sensitivity: 'base'})
+                : valB.localeCompare(valA, undefined, {numeric: true, sensitivity: 'base'});
+        });
+
+        // UI Updates
+        document.querySelectorAll('th').forEach(th => th.classList.remove('sort-asc', 'sort-desc'));
+        headerElement.classList.add(sortDirection ? 'sort-asc' : 'sort-desc');
+
+        rows.forEach(row => tbody.appendChild(row));
+        sortDirection = !sortDirection;
+        autoSave();
     }
 
     function showFilter(colIndex, event) {
@@ -145,7 +176,7 @@
         saveStatus.innerText = "● Saved " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         setTimeout(() => saveStatus.innerText = "", 2000);
     }
-    setInterval(autoSave, 5000);
+    setInterval(autoSave, 10000);
 
     function handleItemInput(cell) {
         const val = cell.innerText.trim().toLowerCase();
@@ -173,7 +204,7 @@
     }
 
     function clearAllData() {
-        if (confirm("Are you sure you want to delete all data ?")) {
+        if (confirm("Are you sure you want to delete all data?")) {
             localStorage.removeItem('cwh_filter_v1');
             initTable(20);
             saveStatus.innerText = "● Cleared";
@@ -184,12 +215,15 @@
     function downloadPNG() {
         const rows = Array.from(tbody.rows);
         const original = rows.map(r => r.style.display);
+        // စာမရှိတဲ့ row တွေကို ခဏဖျောက်ထားမယ်
         rows.forEach(r => { if (r.cells[1].innerText.trim() === "" && r.cells[2].innerText.trim() === "") r.style.display = 'none'; });
-        html2canvas(document.getElementById("captureArea"), { scale: 4 }).then(canvas => {
+        
+        html2canvas(document.getElementById("captureArea"), { scale: 3 }).then(canvas => {
             const link = document.createElement('a');
-            link.download = `CWH_${new Date().getTime()}.png`;
+            link.download = `CWH_${new Date().toISOString().slice(0,10)}.png`;
             link.href = canvas.toDataURL();
             link.click();
+            // မူလအတိုင်း ပြန်ဖော်မယ်
             rows.forEach((r, i) => r.style.display = original[i]);
         });
     }
